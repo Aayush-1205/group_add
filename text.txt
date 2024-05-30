@@ -1,0 +1,133 @@
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+
+const App = () => {
+  const [groups, setGroups] = useState([]);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupMembers, setNewGroupMembers] = useState('');
+
+  const fetchGroups = async () => {
+    try {
+      const response = await axios.get('http://localhost:3300/groups');
+      setGroups(response.data);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleAddGroup = async () => {
+    try {
+      const response = await axios.post('http://localhost:3300/groups', {
+        name: newGroupName,
+        members: newGroupMembers.split(',').map(member => member.trim())
+      });
+      setGroups([...groups, response.data]);
+      setNewGroupName('');
+      setNewGroupMembers('');
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  useEffect(() => {
+    fetchGroups();
+  }, [])
+
+  return (
+    <div>
+      <h1>Group App</h1>
+      <div>
+        <input
+          type="text"
+          placeholder="Group Name"
+          value={newGroupName}
+          onChange={e => setNewGroupName(e.target.value)}
+        />
+        <input
+          type="text"
+          placeholder="Members (comma-separated)"
+          value={newGroupMembers}
+          onChange={e => setNewGroupMembers(e.target.value)}
+        />
+        <button onClick={handleAddGroup}>Add Group</button>
+      </div>
+      <h2>Groups</h2>
+      <ul>
+        {groups.map((group) => (
+          <>
+            <li key={group._id}>{group.name}</li>
+            <ol>
+              {group.members.map((gm) => (
+                <li key={gm}>{gm}</li>
+              ))}
+            </ol>
+          </>
+        ))}
+      </ul>
+    </div>
+  );
+};
+
+export default App;
+
+
+
+const express = require('express');
+const mongoose = require('mongoose');
+const multer = require('multer');
+const cors = require('cors');
+const bodyParser = require('body-parser');
+
+const app = express();
+const port = 3300;
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
+
+// Connect to MongoDB
+mongoose.connect('mongodb+srv://devil:evilatlas514@cluster1.urdfqre.mongodb.net/?retryWrites=true&w=majority&appName=Cluster1', { useNewUrlParser: true });
+const db = mongoose.connection;
+db.on('error', console.error.bind(console, 'connection error:'));
+db.once('open', function() {
+  console.log('Connected to MongoDB');
+});
+
+// Define a Group model
+const groupSchema = new mongoose.Schema({
+  name: String,
+  members: [String]
+});
+const Group = mongoose.model('Group', groupSchema);
+
+// Sample routes
+app.get('/', (req, res) => {
+  res.send('Group App Backend');
+});
+
+app.get('/groups', async (req, res) => {
+  try {
+    const groups = await Group.find();
+    res.json(groups);
+  } catch (error) {
+    res.status(500).send("Couldn't fetch groups");
+  }
+});
+
+app.post('/groups', async (req, res) => {
+  try {
+    const { name, members } = req.body;
+    const newGroup = new Group({ name, members });
+    await newGroup.save();
+    res.status(201).json(newGroup);
+  } catch (error) {
+    res.status(400).send("Couldn't create group");
+  }
+});
+
+// Start the server
+app.listen(port, () => {
+  console.log(`Server started on http://localhost:${port}`);
+});
